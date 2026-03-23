@@ -127,4 +127,6 @@ GitHub Actions runs `01_generate_daily.py` every day at 7am UTC, appending ~215 
 
 ## Dashboard
 
+[![Dashboard preview](assets/dashboard_preview.png)](https://lookerstudio.google.com/reporting/89178669-a528-408d-8c12-ecd8c86240eb)
+
 [View live dashboard →](https://lookerstudio.google.com/reporting/89178669-a528-408d-8c12-ecd8c86240eb)
