@@ -29,4 +29,4 @@ jobs:
           echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa_key.json" >> $GITHUB_ENV
 
       - name: Run daily pipeline
-        run: python generate_daily.py --project promo-roi-engine
+        run: python 03_generate_daily.py --project promo-roi-engine

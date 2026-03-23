@@ -30,11 +30,11 @@ Built with Python, BigQuery, and Looker Studio — with a daily automated data p
 ## Project structure
 
 ```
-├── generate_dataset.py       # Generates full historical dataset (Jan 2025 → today)
-├── generate_daily.py         # Appends one day of data to BigQuery (runs daily via CI)
-├── 01_schema.sql             # BigQuery table definitions
+├── 01_generate_dataset.py    # Generates full historical dataset (Jan 2025 → today)
 ├── 02_load_to_bq.py          # Loads CSV data into BigQuery
-├── 03_transforms.sql         # Analytical views built on top of raw tables
+├── 03_generate_daily.py      # Appends one day of data to BigQuery (runs daily via CI)
+├── 01_schema.sql             # BigQuery table definitions (local only)
+├── 02_transforms.sql         # Analytical views built on top of raw tables (local only)
 └── .github/workflows/
     └── daily_pipeline.yml    # GitHub Actions daily schedule
 ```
@@ -118,13 +118,13 @@ gcloud auth application-default login
 
 **3. Generate historical data and load to BigQuery**
 ```bash
-python generate_dataset.py
+python 01_generate_dataset.py
 python 02_load_to_bq.py --project YOUR_PROJECT --data-dir ./data
 ```
 
 **4. Run SQL transforms**
 
-Open `03_transforms.sql` in the BigQuery console, replace `YOUR_PROJECT` with your project ID, and run each `CREATE OR REPLACE VIEW` statement.
+Open `02_transforms.sql` in the BigQuery console, replace `YOUR_PROJECT` with your project ID, and run each `CREATE OR REPLACE VIEW` statement.
 
 ---
 
