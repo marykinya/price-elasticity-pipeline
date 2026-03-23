@@ -1,99 +1,138 @@
-# Promo ROI Engine — Synthetic Dataset
+# Promo ROI Engine
 
-Part of a portfolio project demonstrating **price elasticity analysis + marketing attribution** using Python, BigQuery SQL, and Looker Studio.
+A end-to-end data pipeline that models the relationship between promotional discounts and revenue performance across marketing channels.
 
----
-
-## Tables
-
-### `campaigns.csv` — 159 rows
-Paid campaign metadata. Covers Jan 2023 – Mar 2024.
-
-| Column | Type | Notes |
-|---|---|---|
-| `campaign_id` | string | Primary key (`CMP0001`…) |
-| `channel` | string | `paid_search`, `email`, `paid_social` |
-| `campaign_name` | string | Synthetic name |
-| `start_date` / `end_date` | date | Campaign window |
-| `discount_pct` | float | Discount offered (0–0.25) |
-| `budget_usd` | float | Total spend budget |
-| `cpc_usd` | float | Cost per click |
+Built with Python, BigQuery, and Looker Studio — with a daily automated data pipeline running on GitHub Actions.
 
 ---
 
-### `sessions.csv` — 80,000 rows
-One row per website visit. Channels: organic search, paid search, email, social organic, paid social, direct, referral.
+## What it does
 
-| Column | Type | Notes |
-|---|---|---|
-| `session_id` | string | Primary key |
-| `timestamp` | datetime | Visit time |
-| `channel` | string | Traffic source |
-| `campaign_id` | string | FK → campaigns (null for organic/direct) |
-| `discount_pct` | float | Active discount at time of visit |
-| `converted` | bool | Whether visit resulted in a purchase |
-| `session_duration_s` | int | Seconds on site |
-| `pages_viewed` | int | Pages per session |
-| `device` | string | desktop / mobile / tablet |
-| `country` | string | ISO 2-letter code |
+- Generates realistic e-commerce session, order, and campaign data with baked-in price elasticity signals
+- Loads and maintains three BigQuery tables, appending ~215 new sessions daily via GitHub Actions
+- Runs SQL transformations to produce four analytical views: channel performance, discount elasticity, campaign ROAS, and product margin analysis
+- Visualised in a Looker Studio dashboard connected live to BigQuery
 
 ---
 
-### `orders.csv` — ~3,846 rows
-One row per order. Joined 1:1 with converted sessions.
+## Stack
 
-| Column | Type | Notes |
-|---|---|---|
-| `order_id` | string | Primary key |
-| `session_id` | string | FK → sessions |
-| `channel` | string | Attribution channel |
-| `campaign_id` | string | FK → campaigns (nullable) |
-| `order_date` | date | |
-| `product` | string | One of 5 products |
-| `category` | string | software / services / education |
-| `base_price_usd` | float | List price before discount |
-| `discount_pct` | float | Applied discount |
-| `final_price_usd` | float | Price paid |
-| `quantity` | int | Units ordered |
-| `revenue_usd` | float | `final_price * quantity` |
-| `gross_margin_usd` | float | Revenue minus simulated COGS |
+| Layer | Tool |
+|---|---|
+| Data generation | Python (`pandas`, `faker`, `numpy`) |
+| Data warehouse | Google BigQuery |
+| Transformations | BigQuery SQL |
+| Orchestration | GitHub Actions (daily cron) |
+| Visualisation | Looker Studio |
 
 ---
 
-## Baked-in signals
+## Project structure
 
-These patterns are intentionally embedded so the analysis can surface them:
-
-| Channel | Base CVR | Price elasticity |
-|---|---|---|
-| email | 7.1% | **–2.1** (highly elastic) |
-| paid_search | 5.8% | –1.4 |
-| paid_social | 4.4% | –1.6 |
-| direct | 3.9% | –1.0 |
-| organic_search | 3.2% | –0.9 |
-| referral | 2.7% | –0.8 |
-| social_organic | 2.1% | –0.7 |
-
-- **Email is the most elastic channel** — a 10% discount increases email-attributed orders ~21%
-- ~56% of orders have no discount, creating a natural control group
-- Country mix skews African markets (KE, NG, ZA, GH) — relevant for regional pricing analysis
-
----
-
-## Next steps in the project
-
-1. **BigQuery** — load the three CSVs as tables; write transformation SQL (ROAS by channel, cohort CVR, discount uplift)
-2. **Python — Attribution** — implement last-touch and data-driven (Shapley) attribution with `scikit-learn`
-3. **Python — Elasticity** — run log-log OLS regression (`statsmodels`) per channel
-4. **Looker Studio** — connect to BigQuery; build channel elasticity + ROAS dashboard
-
----
-
-## Regenerating
-
-```bash
-pip install pandas numpy faker
-python generate_dataset.py
+```
+├── generate_dataset.py       # Generates full historical dataset (Jan 2025 → today)
+├── generate_daily.py         # Appends one day of data to BigQuery (runs daily via CI)
+├── 01_schema.sql             # BigQuery table definitions
+├── 02_load_to_bq.py          # Loads CSV data into BigQuery
+├── 03_transforms.sql         # Analytical views built on top of raw tables
+└── .github/workflows/
+    └── daily_pipeline.yml    # GitHub Actions daily schedule
 ```
 
-Seed is fixed (`np.random.seed(42)`) so output is fully reproducible.
+---
+
+## BigQuery schema
+
+### `campaigns`
+Paid campaign metadata — one row per campaign across paid search, email, and paid social channels.
+
+| Column | Type | Description |
+|---|---|---|
+| `campaign_id` | STRING | Primary key (`CMP0001`…) |
+| `channel` | STRING | `paid_search`, `email`, `paid_social` |
+| `campaign_name` | STRING | Campaign label |
+| `start_date` / `end_date` | DATE | Campaign window |
+| `discount_pct` | FLOAT | Discount offered (0–0.25) |
+| `budget_usd` | FLOAT | Total spend budget |
+| `cpc_usd` | FLOAT | Cost per click |
+
+### `sessions`
+One row per website visit across all traffic sources.
+
+| Column | Type | Description |
+|---|---|---|
+| `session_id` | STRING | Primary key |
+| `timestamp` | TIMESTAMP | Visit time |
+| `channel` | STRING | Traffic source |
+| `campaign_id` | STRING | FK → campaigns (null for organic/direct) |
+| `discount_pct` | FLOAT | Active discount at time of visit |
+| `converted` | BOOL | Whether the visit resulted in a purchase |
+| `session_duration_s` | INT | Seconds on site |
+| `pages_viewed` | INT | Pages per session |
+| `device` | STRING | `desktop`, `mobile`, `tablet` |
+| `country` | STRING | ISO 2-letter country code |
+
+### `orders`
+One row per order, joined 1:1 with converted sessions.
+
+| Column | Type | Description |
+|---|---|---|
+| `order_id` | STRING | Primary key |
+| `session_id` | STRING | FK → sessions |
+| `channel` | STRING | Attribution channel |
+| `campaign_id` | STRING | FK → campaigns (nullable) |
+| `order_date` | DATE | Date of purchase |
+| `product` | STRING | One of 5 products |
+| `category` | STRING | `software`, `services`, `education` |
+| `base_price_usd` | FLOAT | List price before discount |
+| `discount_pct` | FLOAT | Applied discount |
+| `final_price_usd` | FLOAT | Price paid |
+| `quantity` | INT | Units ordered |
+| `revenue_usd` | FLOAT | `final_price × quantity` |
+| `gross_margin_usd` | FLOAT | Revenue minus simulated COGS |
+
+---
+
+## Analytical views (`03_transforms.sql`)
+
+| View | Description |
+|---|---|
+| `channel_daily` | Daily sessions, CVR, revenue, spend, and ROAS per channel |
+| `discount_elasticity` | CVR lift and implied price elasticity by channel × discount tier |
+| `campaign_roas` | ROAS, ROI, and cost-per-order per campaign |
+| `product_discount_summary` | Revenue and margin by product × discount tier |
+
+---
+
+## Running locally
+
+**1. Install dependencies**
+```bash
+pip install google-cloud-bigquery pandas numpy faker db-dtypes
+```
+
+**2. Authenticate**
+```bash
+gcloud auth application-default login
+```
+
+**3. Generate historical data and load to BigQuery**
+```bash
+python generate_dataset.py
+python 02_load_to_bq.py --project YOUR_PROJECT --data-dir ./data
+```
+
+**4. Run SQL transforms**
+
+Open `03_transforms.sql` in the BigQuery console, replace `YOUR_PROJECT` with your project ID, and run each `CREATE OR REPLACE VIEW` statement.
+
+---
+
+## Daily automation
+
+GitHub Actions runs `generate_daily.py` every day at 7am UTC, appending ~215 new sessions and their resulting orders to BigQuery. Looker Studio reflects the updates on the next report load.
+
+To set this up on your own fork:
+1. Create a GCP service account with **BigQuery Data Editor** + **BigQuery Job User** roles
+2. Download the JSON key and add it as a GitHub secret named `GCP_SA_KEY`
+3. The workflow in `.github/workflows/daily_pipeline.yml` will handle the rest
