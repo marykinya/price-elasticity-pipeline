@@ -1,4 +1,4 @@
-# Promo ROI Engine
+# Marketing Attribution & Price Elasticity
 
 A end-to-end data pipeline that models the relationship between promotional discounts and revenue performance across marketing channels.
 
