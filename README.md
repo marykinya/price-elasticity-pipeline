@@ -2,9 +2,8 @@
 
 A end-to-end data pipeline that models the relationship between promotional discounts and revenue performance across marketing channels.
 
-Built with Python, BigQuery, and Looker Studio — with a daily automated data pipeline running on GitHub Actions.
+Built with Python, BigQuery, and Looker Studio, with a daily automated data pipeline running on GitHub Actions.
 
----
 
 ## What it does
 
@@ -13,7 +12,6 @@ Built with Python, BigQuery, and Looker Studio — with a daily automated data p
 - Runs SQL transformations to produce four analytical views: channel performance, discount elasticity, campaign ROAS, and product margin analysis
 - Visualised in a Looker Studio dashboard connected live to BigQuery
 
----
 
 ## Stack
 
@@ -25,7 +23,6 @@ Built with Python, BigQuery, and Looker Studio — with a daily automated data p
 | Orchestration | GitHub Actions (daily cron) |
 | Visualisation | Looker Studio |
 
----
 
 ## Project structure
 
@@ -39,7 +36,6 @@ Built with Python, BigQuery, and Looker Studio — with a daily automated data p
     └── daily_pipeline.yml    # GitHub Actions daily schedule
 ```
 
----
 
 ## BigQuery schema
 
@@ -91,18 +87,16 @@ One row per order, joined 1:1 with converted sessions.
 | `revenue_usd` | FLOAT | `final_price × quantity` |
 | `gross_margin_usd` | FLOAT | Revenue minus simulated COGS |
 
----
 
-## Analytical views (`03_transforms.sql`)
+## BigQuery views that feed into Looker Studio
 
 | View | Description |
 |---|---|
 | `channel_daily` | Daily sessions, CVR, revenue, spend, and ROAS per channel |
-| `discount_elasticity` | CVR lift and implied price elasticity by channel × discount tier |
-| `campaign_roas` | ROAS, ROI, and cost-per-order per campaign |
+| `discount_elasticity` | Conversion lift and implied price elasticity by channel × discount tier |
+| `campaign_roas` | Return-on-Ad-Spend, Return-on-Investment, and cost-per-order per campaign |
 | `product_discount_summary` | Revenue and margin by product × discount tier |
 
----
 
 ## Running locally
 
@@ -124,15 +118,13 @@ python 02_load_to_bq.py --project YOUR_PROJECT --data-dir ./data
 
 **4. Run SQL transforms**
 
-Open `02_transforms.sql` in the BigQuery console, replace `YOUR_PROJECT` with your project ID, and run each `CREATE OR REPLACE VIEW` statement.
+Open the BigQuery console, create the views. 
 
----
 
 ## Daily automation
 
-GitHub Actions runs `generate_daily.py` every day at 7am UTC, appending ~215 new sessions and their resulting orders to BigQuery. Looker Studio reflects the updates on the next report load.
+GitHub Actions runs `01_generate_daily.py` every day at 7am UTC, appending ~215 new sessions and their resulting orders to BigQuery. Looker Studio reflects the updates on the next report load.
 
-To set this up on your own fork:
-1. Create a GCP service account with **BigQuery Data Editor** + **BigQuery Job User** roles
-2. Download the JSON key and add it as a GitHub secret named `GCP_SA_KEY`
-3. The workflow in `.github/workflows/daily_pipeline.yml` will handle the rest
+## Dashboard
+
+[View live dashboard →](https://lookerstudio.google.com/reporting/89178669-a528-408d-8c12-ecd8c86240eb)
