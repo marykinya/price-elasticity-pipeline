@@ -17,5 +17,6 @@ data/
 # Environment variables
 .env
 
-# Draft dash
-.html
+# SQL and HTML (local reference files)
+*.sql
+*.html
