@@ -1,0 +1,21 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.Python
+
+# Credentials
+*.json
+
+# Data (large generated files)
+data/
+
+# macOS
+.DS_Store
+
+# Environment variables
+.env
+
+# Draft dash
+.html
