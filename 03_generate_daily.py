@@ -47,8 +47,8 @@ PRODUCTS = {
 DISCOUNT_TIERS        = [0.0, 0.0, 0.0, 0.05, 0.10, 0.10, 0.15, 0.20, 0.25]
 PAID_CHANNELS         = ["paid_search", "email", "paid_social"]
 SESSIONS_PER_RUN      = 215   # ~1,500/week
-NEW_CAMPAIGNS_PER_RUN = 0     # add a new campaign roughly once a week
-NEW_CAMPAIGN_CHANCE   = 0.3   # 30% chance each daily run adds a campaign
+NEW_CAMPAIGNS_PER_RUN = 1     # campaigns to create when the daily chance fires
+NEW_CAMPAIGN_CHANCE   = 0.4   # 40% chance each daily run adds a campaign
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -298,9 +298,10 @@ def main():
     else:
         print("No new campaigns today.")
 
-    # New sessions
-    print(f"Generating {SESSIONS_PER_RUN:,} sessions...", end=" ")
-    sessions = build_weekly_sessions(all_campaigns, week_start, week_end, max_session_id, SESSIONS_PER_RUN)
+    # New sessions — vary daily traffic to simulate real fluctuation
+    n_sessions = random.randint(130, 320)
+    print(f"Generating {n_sessions:,} sessions...", end=" ")
+    sessions = build_weekly_sessions(all_campaigns, week_start, week_end, max_session_id, n_sessions)
     rows = append_to_bq(client, sessions, "sessions", SESSION_SCHEMA)
     print(f"{rows:,} rows appended ✓")
 
