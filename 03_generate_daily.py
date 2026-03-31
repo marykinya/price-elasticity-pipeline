@@ -8,6 +8,7 @@ Run automatically via cron, or manually:
 """
 
 import argparse
+import io
 import random
 import warnings
 from datetime import datetime, timedelta, date
@@ -16,6 +17,8 @@ import numpy as np
 import pandas as pd
 from faker import Faker
 from google.cloud import bigquery
+
+from config import CHANNELS, PRODUCTS, DISCOUNT_TIERS, PAID_CHANNELS
 
 warnings.filterwarnings("ignore")
 
@@ -26,26 +29,6 @@ random.seed()
 DATASET  = "promo_roi"
 PROJECT  = None   # set from args
 
-CHANNELS = {
-    "organic_search": {"weight": 0.28, "base_cvr": 0.032, "elasticity": -0.9},
-    "paid_search":    {"weight": 0.22, "base_cvr": 0.058, "elasticity": -1.4},
-    "email":          {"weight": 0.18, "base_cvr": 0.071, "elasticity": -2.1},
-    "social_organic": {"weight": 0.14, "base_cvr": 0.021, "elasticity": -0.7},
-    "paid_social":    {"weight": 0.10, "base_cvr": 0.044, "elasticity": -1.6},
-    "direct":         {"weight": 0.05, "base_cvr": 0.039, "elasticity": -1.0},
-    "referral":       {"weight": 0.03, "base_cvr": 0.027, "elasticity": -0.8},
-}
-
-PRODUCTS = {
-    "analytics_pro":   {"base_price": 199.0, "category": "software"},
-    "data_starter":    {"base_price":  49.0, "category": "software"},
-    "consulting_hour": {"base_price": 150.0, "category": "services"},
-    "training_bundle": {"base_price":  89.0, "category": "education"},
-    "api_access":      {"base_price":  29.0, "category": "software"},
-}
-
-DISCOUNT_TIERS        = [0.0, 0.0, 0.0, 0.05, 0.10, 0.10, 0.15, 0.20, 0.25]
-PAID_CHANNELS         = ["paid_search", "email", "paid_social"]
 SESSIONS_PER_RUN      = 215   # ~1,500/week
 NEW_CAMPAIGNS_PER_RUN = 1     # campaigns to create when the daily chance fires
 NEW_CAMPAIGN_CHANCE   = 0.4   # 40% chance each daily run adds a campaign
@@ -213,7 +196,6 @@ def append_to_bq(client, df: pd.DataFrame, table: str, schema: list):
         source_format=bigquery.SourceFormat.CSV,
         skip_leading_rows=1,
     )
-    import io
     buf = io.BytesIO(df.to_csv(index=False).encode())
     job = client.load_table_from_file(buf, table_ref, job_config=job_config)
     job.result()
