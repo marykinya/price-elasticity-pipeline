@@ -2,7 +2,7 @@ name: Daily Data Pipeline
 
 on:
   schedule:
-    - cron: '14 13 * * *'  # Every day at 1:14pm UTC
+    - cron: '15 7 * * *'  # Every day at 7:15am UTC
   workflow_dispatch:       # Lets you trigger it manually from GitHub
 
 jobs:
