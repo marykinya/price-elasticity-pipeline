@@ -1,5 +1,5 @@
 """
-Promo ROI Engine — Weekly Incremental Generator
+Promo ROI Engine - Weekly Incremental Generator
 Generates one week of sessions, orders, and occasional new campaigns,
 then appends them to BigQuery.
 
@@ -90,7 +90,7 @@ def build_new_campaigns(start_campaign_id: int, week_start: date) -> pd.DataFram
         rows.append({
             "campaign_id":   f"CMP{campaign_id:04d}",
             "channel":       ch,
-            "campaign_name": f"{ch.replace('_',' ').title()} – {fake.catch_phrase()[:40]}",
+            "campaign_name": f"{ch.replace('_',' ').title()} - {fake.catch_phrase()[:40]}",
             "start_date":    week_start,
             "end_date":      week_start + timedelta(days=random.randint(7, 21)),
             "discount_pct":  discount,
@@ -280,7 +280,7 @@ def main():
     else:
         print("No new campaigns today.")
 
-    # New sessions — vary daily traffic to simulate real fluctuation
+    # New sessions - vary daily traffic to simulate real fluctuation
     n_sessions = random.randint(130, 320)
     print(f"Generating {n_sessions:,} sessions...", end=" ")
     sessions = build_weekly_sessions(all_campaigns, week_start, week_end, max_session_id, n_sessions)

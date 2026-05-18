@@ -1,5 +1,5 @@
 """
-Promo ROI Engine — Synthetic Dataset Generator
+Promo ROI Engine - Synthetic Dataset Generator
 Generates three interlocking tables: sessions, orders, campaigns
 Designed to produce realistic price elasticity + attribution signals
 """
@@ -51,7 +51,7 @@ def build_campaigns():
     rows = []
     campaign_id = 1
 
-    for month_offset in range(15):  # Jan 2023 – Mar 2024
+    for month_offset in range(15):  # Jan 2023 - Mar 2024
         month_start = START_DATE + timedelta(days=30 * month_offset)
         for ch in PAID_CHANNELS:
             n = random.randint(2, 5)
@@ -61,7 +61,7 @@ def build_campaigns():
                 rows.append({
                     "campaign_id":   f"CMP{campaign_id:04d}",
                     "channel":       ch,
-                    "campaign_name": f"{ch.replace('_',' ').title()} – {fake.catch_phrase()[:40]}",
+                    "campaign_name": f"{ch.replace('_',' ').title()} - {fake.catch_phrase()[:40]}",
                     "start_date":    month_start.date(),
                     "end_date":      (month_start + timedelta(days=random.randint(7, 28))).date(),
                     "discount_pct":  discount,

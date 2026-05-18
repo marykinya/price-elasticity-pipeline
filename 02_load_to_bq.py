@@ -1,5 +1,5 @@
 """
-Promo ROI Engine — BigQuery Data Loader
+Promo ROI Engine - BigQuery Data Loader
 Loads the three synthetic CSVs into BigQuery using the Python client.
 
 Usage:

@@ -2,14 +2,18 @@
 
 A end-to-end data pipeline that models the relationship between promotional discounts and revenue performance across marketing channels.
 
-Built with Python, BigQuery, and Looker Studio, with a daily automated data pipeline running on GitHub Actions.
+Built with Python, BigQuery and Looker Studio; with a daily automated data pipeline running on GitHub Actions.
 
 
 ## What it does
 
 - Generates realistic e-commerce session, order, and campaign data with baked-in price elasticity signals
 - Loads and maintains three BigQuery tables, appending ~215 new sessions daily via GitHub Actions
-- Runs SQL transformations to produce four analytical views: channel performance, discount elasticity, campaign ROAS, and product margin analysis
+- Runs SQL transformations to produce four analytical views: 
+    - channel performance
+    - discount elasticity
+    - campaign ROAS (Return-on-Ad-Spend)
+    - product margin analysis
 - Visualised in a Looker Studio dashboard connected live to BigQuery
 
 
@@ -40,7 +44,7 @@ Built with Python, BigQuery, and Looker Studio, with a daily automated data pipe
 ## BigQuery schema
 
 ### `campaigns`
-Paid campaign metadata — one row per campaign across paid search, email, and paid social channels.
+Paid campaign metadata - one row per campaign across paid search, email, and paid social channels.
 
 | Column | Type | Description |
 |---|---|---|
@@ -96,30 +100,6 @@ One row per order, joined 1:1 with converted sessions.
 | `discount_elasticity` | Conversion lift and implied price elasticity by channel × discount tier |
 | `campaign_roas` | Return-on-Ad-Spend, Return-on-Investment, and cost-per-order per campaign |
 | `product_discount_summary` | Revenue and margin by product × discount tier |
-
-
-## Running locally
-
-**1. Install dependencies**
-```bash
-pip install google-cloud-bigquery pandas numpy faker db-dtypes
-```
-
-**2. Authenticate**
-```bash
-gcloud auth application-default login
-```
-
-**3. Generate historical data and load to BigQuery**
-```bash
-python 01_generate_dataset.py
-python 02_load_to_bq.py --project YOUR_PROJECT --data-dir ./data
-```
-
-**4. Run SQL transforms**
-
-Open the BigQuery console, create the views. 
-
 
 ## Daily automation
 
