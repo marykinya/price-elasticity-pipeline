@@ -8,6 +8,9 @@ on:
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write   # needed by keepalive to re-enable the workflow
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -32,3 +35,8 @@ jobs:
 
       - name: Run daily pipeline
         run: python 03_generate_daily.py --project promo-roi-engine
+
+      # GitHub disables scheduled workflows after 60 days without repo activity.
+      # This re-enables the workflow via the API (no dummy commits).
+      - name: Keep workflow alive
+        uses: gautamkrishnar/keepalive-workflow@v2
