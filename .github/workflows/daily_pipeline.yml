@@ -37,6 +37,8 @@ jobs:
         run: python 03_generate_daily.py --project promo-roi-engine
 
       # GitHub disables scheduled workflows after 60 days without repo activity.
-      # This re-enables the workflow via the API (no dummy commits).
+      # Re-enabling via the API resets that timer (no dummy commits, no third-party action).
       - name: Keep workflow alive
-        uses: gautamkrishnar/keepalive-workflow@v2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT repos/${{ github.repository }}/actions/workflows/daily_pipeline.yml/enable
