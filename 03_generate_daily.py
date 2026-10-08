@@ -3,6 +3,10 @@ Promo ROI Engine - Weekly Incremental Generator
 Generates one week of sessions, orders, and occasional new campaigns,
 then appends them to BigQuery.
 
+Self-healing: each run checks the latest date already in BigQuery and replays
+every missed daily run up to today, so a failed or skipped run is filled in
+by the next successful one. If the data is already current, it does nothing.
+
 Run automatically via cron, or manually:
     python generate_weekly.py --project promo-roi-engine
 """
@@ -10,6 +14,7 @@ Run automatically via cron, or manually:
 import argparse
 import io
 import random
+import sys
 import warnings
 from datetime import datetime, timedelta, date
 
@@ -32,6 +37,8 @@ PROJECT  = None   # set from args
 SESSIONS_PER_RUN      = 215   # ~1,500/week
 NEW_CAMPAIGNS_PER_RUN = 1     # campaigns to create when the daily chance fires
 NEW_CAMPAIGN_CHANCE   = 0.4   # 40% chance each daily run adds a campaign
+MAX_CATCHUP_DAYS      = 90    # refuse to auto-fill gaps longer than this
+GAP_CHECK_DAYS        = 30    # fail the run if any of the last N days is empty
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -76,6 +83,21 @@ def get_max_campaign_id(client) -> int:
     q = f"SELECT MAX(CAST(SUBSTR(campaign_id, 4) AS INT64)) FROM `{PROJECT}.{DATASET}.campaigns`"
     val = client.query(q).to_dataframe().iloc[0, 0]
     return int(val) if val is not None and str(val) != '<NA>' else 0
+
+def get_last_data_date(client) -> date:
+    q = f"SELECT MAX(DATE(timestamp)) FROM `{PROJECT}.{DATASET}.sessions`"
+    return client.query(q).to_dataframe().iloc[0, 0]
+
+def get_empty_days(client, days: int) -> list[date]:
+    """Return dates in the last `days` days (excluding today) with no sessions."""
+    q = f"""
+        SELECT dt FROM UNNEST(GENERATE_DATE_ARRAY(
+            DATE_SUB(CURRENT_DATE(), INTERVAL {days} DAY),
+            DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))) dt
+        WHERE dt NOT IN (SELECT DISTINCT DATE(timestamp) FROM `{PROJECT}.{DATASET}.sessions`)
+        ORDER BY dt
+    """
+    return list(client.query(q).to_dataframe()["dt"])
 
 
 # ── Generators ────────────────────────────────────────────────────────────────
@@ -254,52 +276,81 @@ def main():
     PROJECT = args.project
 
     client = bigquery.Client(project=PROJECT)
-
-    week_end   = date.today()
-    week_start = week_end - timedelta(days=1)
-
-    print(f"Day: {week_start} → {week_end}")
+    today  = date.today()
     print(f"Project: {PROJECT} / Dataset: {DATASET}\n")
 
-    # Fetch existing state
-    print("Fetching existing data from BigQuery...")
-    campaigns_df   = get_existing_campaigns(client)
-    max_session_id, max_order_id = get_max_ids(client)
-    max_campaign_id = get_max_campaign_id(client)
-    print(f"  Existing: {len(campaigns_df)} campaigns, "
-          f"session #{max_session_id:,}, order #{max_order_id:,}\n")
+    # Work out which daily runs are missing. Each run covers (run_date - 1, run_date),
+    # so the run after the latest data date is the first one that never happened.
+    last_date = get_last_data_date(client)
+    run_dates = [last_date + timedelta(days=i)
+                 for i in range(1, (today - last_date).days + 1)]
+    print(f"Latest data in BigQuery: {last_date}")
 
-    # New campaigns (randomly, ~once a week)
-    all_campaigns = campaigns_df.copy()
-    if random.random() < NEW_CAMPAIGN_CHANCE:
-        print(f"Generating 1 new campaign...", end=" ")
-        new_campaigns = build_new_campaigns(max_campaign_id, week_start)
-        all_campaigns = pd.concat([campaigns_df, new_campaigns], ignore_index=True)
-        rows = append_to_bq(client, new_campaigns, "campaigns", CAMPAIGN_SCHEMA)
-        print(f"{rows} row appended ✓")
+    if not run_dates:
+        print("Data is already up to date - nothing to generate.")
+    elif len(run_dates) > MAX_CATCHUP_DAYS:
+        sys.exit(f"Gap of {len(run_dates)} days exceeds MAX_CATCHUP_DAYS={MAX_CATCHUP_DAYS}; "
+                 f"backfill manually or raise the limit.")
     else:
-        print("No new campaigns today.")
+        if len(run_dates) > 1:
+            print(f"Catching up {len(run_dates)} missed runs: {run_dates[0]} → {run_dates[-1]}")
 
-    # New sessions - vary daily traffic to simulate real fluctuation
-    n_sessions = random.randint(130, 320)
-    print(f"Generating {n_sessions:,} sessions...", end=" ")
-    sessions = build_weekly_sessions(all_campaigns, week_start, week_end, max_session_id, n_sessions)
-    rows = append_to_bq(client, sessions, "sessions", SESSION_SCHEMA)
-    print(f"{rows:,} rows appended ✓")
+        # Fetch existing state
+        print("Fetching existing data from BigQuery...")
+        campaigns_df   = get_existing_campaigns(client)
+        max_session_id, max_order_id = get_max_ids(client)
+        max_campaign_id = get_max_campaign_id(client)
+        print(f"  Existing: {len(campaigns_df)} campaigns, "
+              f"session #{max_session_id:,}, order #{max_order_id:,}\n")
 
-    # New orders
-    n_converted = sessions["converted"].sum()
-    print(f"Generating orders from {n_converted} conversions...", end=" ")
-    orders = build_weekly_orders(sessions, max_order_id)
-    rows = append_to_bq(client, orders, "orders", ORDER_SCHEMA)
-    print(f"{rows:,} rows appended ✓")
+        # Generate every missed day in memory, then load once per table
+        all_campaigns = campaigns_df.copy()
+        new_campaigns, new_sessions, new_orders = [], [], []
+        for run_date in run_dates:
+            day_start = run_date - timedelta(days=1)
 
-    cvr = sessions["converted"].mean()
-    rev = orders["revenue_usd"].sum()
-    print(f"\nDaily summary:")
-    print(f"  Sessions : {len(sessions):,}  (CVR = {cvr:.2%})")
-    print(f"  Orders   : {len(orders):,}  (Revenue = ${rev:,.0f})")
-    print(f"\nDone. Looker Studio will reflect the new data on next report load.")
+            # New campaigns (randomly, ~once a week)
+            if random.random() < NEW_CAMPAIGN_CHANCE:
+                c = build_new_campaigns(max_campaign_id, day_start)
+                max_campaign_id += len(c)
+                new_campaigns.append(c)
+                all_campaigns = pd.concat([all_campaigns, c], ignore_index=True)
+
+            # New sessions - vary daily traffic to simulate real fluctuation
+            s = build_weekly_sessions(all_campaigns, day_start, run_date, max_session_id,
+                                      random.randint(130, 320))
+            o = build_weekly_orders(s, max_order_id)
+            max_session_id += len(s)
+            max_order_id   += len(o)
+            new_sessions.append(s)
+            new_orders.append(o)
+
+        sessions = pd.concat(new_sessions, ignore_index=True)
+        orders   = pd.concat(new_orders, ignore_index=True)
+
+        if new_campaigns:
+            rows = append_to_bq(client, pd.concat(new_campaigns, ignore_index=True),
+                                "campaigns", CAMPAIGN_SCHEMA)
+            print(f"Campaigns: {rows:,} rows appended ✓")
+        else:
+            print("No new campaigns.")
+        rows = append_to_bq(client, sessions, "sessions", SESSION_SCHEMA)
+        print(f"Sessions : {rows:,} rows appended ✓")
+        rows = append_to_bq(client, orders, "orders", ORDER_SCHEMA)
+        print(f"Orders   : {rows:,} rows appended ✓")
+
+        cvr = sessions["converted"].mean()
+        rev = orders["revenue_usd"].sum()
+        print(f"\nSummary ({len(run_dates)} run{'s' if len(run_dates) > 1 else ''}):")
+        print(f"  Sessions : {len(sessions):,}  (CVR = {cvr:.2%})")
+        print(f"  Orders   : {len(orders):,}  (Revenue = ${rev:,.0f})")
+
+    # Final check: fail the job (and trigger GitHub's failure email) if any recent day is empty
+    empty = get_empty_days(client, GAP_CHECK_DAYS)
+    if empty:
+        sys.exit(f"Gap check FAILED - no sessions on: {', '.join(map(str, empty))}")
+    print(f"\nGap check passed: no empty days in the last {GAP_CHECK_DAYS} days.")
+    print(f"Done. Looker Studio will reflect the new data on next report load.")
 
 
 if __name__ == "__main__":
